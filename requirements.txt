@@ -16,3 +16,5 @@ sentence-transformers
 torch
 
 tiktoken
+
+flask
