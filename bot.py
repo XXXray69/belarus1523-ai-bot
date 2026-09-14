@@ -1,5 +1,8 @@
 import os
 import re
+import threading
+
+from flask import Flask
 
 from dotenv import load_dotenv
 
@@ -24,6 +27,35 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ROUTERAI_API_KEY = os.getenv("ROUTERAI_API_KEY")
 
+PORT = int(os.environ.get("PORT", 10000))
+
+
+
+
+web_app = Flask(__name__)
+
+
+@web_app.route("/")
+def home():
+
+    return "BELARUS 1523 bot is running"
+
+
+
+def run_web():
+
+    web_app.run(
+
+        host="0.0.0.0",
+
+        port=PORT
+
+    )
+
+
+
+
+
 
 print("Загрузка базы знаний...")
 
@@ -43,6 +75,7 @@ embeddings = HuggingFaceEmbeddings(
 )
 
 
+
 db = Chroma(
 
     persist_directory="database",
@@ -52,7 +85,12 @@ db = Chroma(
 )
 
 
+
 print("База знаний загружена")
+
+
+
+
 
 
 llm = ChatOpenAI(
@@ -68,51 +106,75 @@ llm = ChatOpenAI(
 )
 
 
+
 print("ИИ модель подключена")
+
+
+
 
 
 
 def clean_text(text):
 
-    # убираем номера разделов
+
     text = re.sub(
+
         r'\b\d+\.\d+(\.\d+)*\b',
+
         '',
+
         text
+
     )
 
 
-    # убираем рисунки
     text = re.sub(
+
         r'рисунок\s*\d+(\.\d+)*',
+
         '',
+
         text,
+
         flags=re.IGNORECASE
+
     )
 
 
-    # убираем таблицы
     text = re.sub(
+
         r'таблица\s*\d+(\.\d+)*',
+
         '',
+
         text,
+
         flags=re.IGNORECASE
+
     )
 
 
-    # убираем страницы
     text = re.sub(
+
         r'стр\.?\s*\d+',
+
         '',
+
         text,
+
         flags=re.IGNORECASE
+
     )
 
 
     text = re.sub(
+
         r'\s+',
+
         ' ',
+
         text
+
     )
 
 
@@ -122,48 +184,79 @@ def clean_text(text):
 
 def get_roots(text):
 
+
     words = [
+
         x.lower().strip(".,!?")
+
         for x in text.split()
+
     ]
 
 
     return [
+
         w[:5]
+
         for w in words
+
         if len(w) >= 5
+
     ]
 
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+
+async def start(
+
+        update: Update,
+
+        context: ContextTypes.DEFAULT_TYPE
+
+):
+
 
     await update.message.reply_text(
+
 """
 Я ИИ-помощник по трактору БЕЛАРУС МТЗ-1523.
 
-Задавайте вопросы:
-- обслуживание;
-- неисправности;
-- регулировки;
-- устройство;
-- характеристики.
+Помогу найти информацию по:
 
-Можно написать:
+- обслуживанию;
+- устройству;
+- регулировкам;
+- неисправностям;
+- характеристикам.
+
+Можно писать:
 "кратко про двигатель"
 "подробно про безопасность"
 """
+
     )
 
 
 
-async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def answer(
+
+        update: Update,
+
+        context: ContextTypes.DEFAULT_TYPE
+
+):
+
 
     question = update.message.text.strip()
 
 
+
     await update.message.chat.send_action(
+
         action="typing"
+
     )
 
 
@@ -171,20 +264,25 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
         results = db.similarity_search_with_score(
+
             question,
+
             k=30
+
         )
 
 
 
-        # короткий запрос - поиск тем
+        # короткие запросы
 
         if len(question.split()) <= 2:
 
 
             roots = get_roots(question)
 
+
             variants = []
+
 
 
             for doc, score in results:
@@ -197,15 +295,17 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
                     if len(line) < 20:
+
                         continue
 
 
-                    low = line.lower()
-
 
                     if any(
-                        r in low
-                        for r in roots
+
+                        root in line.lower()
+
+                        for root in roots
+
                     ):
 
                         variants.append(line)
@@ -213,8 +313,11 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
             variants = list(
+
                 dict.fromkeys(variants)
+
             )
+
 
 
             if variants:
@@ -223,17 +326,26 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(
 
                     "Нашёл информацию по темам:\n\n"
+
                     +
+
                     "\n".join(
-                        "- " + v[:180]
-                        for v in variants[:8]
+
+                        "- " + x[:180]
+
+                        for x in variants[:8]
+
                     )
+
                     +
+
                     "\n\nНапишите, что именно рассказать."
 
                 )
 
+
                 return
+
 
 
 
@@ -242,13 +354,17 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for doc, score in results:
 
+
             context_text += (
 
                 "\n\n"
+
                 +
+
                 doc.page_content
 
             )
+
 
 
 
@@ -258,7 +374,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 БЕЛАРУС МТЗ-1523.
 
 
-Ответь пользователю по технической документации.
+Используй техническую информацию
+из руководства.
 
 
 Правила:
@@ -268,24 +385,18 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - не показывай страницы;
 - не упоминай рисунки;
 - не упоминай таблицы;
-- не говори "согласно разделу";
-- не описывай процесс поиска;
-- используй только техническую информацию.
+- не говори "в разделе";
+- не рассказывай процесс поиска;
+- не придумывай данные.
 
 
-Если пользователь написал короткий запрос,
-сначала объясни тему простыми словами.
+Если информации нет точно,
+используй максимально близкую тему.
 
 
-Если информации недостаточно:
-скажи это кратко.
-
-
-
-Текст руководства:
+Текст:
 
 {context_text}
-
 
 
 Вопрос:
@@ -295,54 +406,98 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
 
 
-        response = llm.invoke(prompt)
 
+        response = llm.invoke(
 
-        answer = clean_text(
-            response.content
+            prompt
+
         )
 
 
+
         await update.message.reply_text(
-            answer
+
+            clean_text(response.content)
+
         )
 
 
 
     except Exception as e:
 
-        print(e)
+
+        print(
+
+            "Ошибка:",
+
+            e
+
+        )
 
 
         await update.message.reply_text(
-            "Не удалось обработать запрос. Попробуйте уточнить тему."
+
+            "Не удалось обработать запрос."
+
         )
 
 
 
 
-app = Application.builder().token(
+
+
+telegram_app = Application.builder().token(
+
     TELEGRAM_TOKEN
+
 ).build()
 
 
-app.add_handler(
+
+telegram_app.add_handler(
+
     CommandHandler(
+
         "start",
+
         start
+
     )
+
 )
 
 
-app.add_handler(
+
+telegram_app.add_handler(
+
     MessageHandler(
+
         filters.TEXT & ~filters.COMMAND,
+
         answer
+
     )
+
 )
+
+
+
+print("Бот запускается")
+
+
+
+threading.Thread(
+
+    target=run_web,
+
+    daemon=True
+
+).start()
+
 
 
 print("Бот запущен")
 
 
-app.run_polling()
+
+telegram_app.run_polling()
