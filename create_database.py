@@ -12,7 +12,9 @@ load_dotenv()
 
 
 PDF_FILE = "knowledge/manual.pdf"
+
 DB_PATH = "database"
+
 
 
 print("=" * 50)
@@ -23,13 +25,37 @@ print("=" * 50)
 
 
 
+if not os.path.exists(PDF_FILE):
+
+    print(
+        "ОШИБКА: файл руководства не найден"
+    )
+
+    print(
+        os.path.abspath(PDF_FILE)
+    )
+
+    exit()
+
+
+
+
+
 if os.path.exists(DB_PATH):
 
     print("\nВНИМАНИЕ!")
-    print("Папка database уже существует.")
-    print("Удалите её вручную и запустите скрипт снова.")
-    print("Путь:")
-    print(os.path.abspath(DB_PATH))
+
+    print(
+        "Папка database уже существует."
+    )
+
+    print(
+        "Удалите её перед созданием новой базы:"
+    )
+
+    print(
+        os.path.abspath(DB_PATH)
+    )
 
     exit()
 
@@ -67,19 +93,27 @@ splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=400,
 
     separators=[
+
         "\n\n",
+
         "\n",
+
         ". ",
+
         " ",
+
         ""
+
     ]
 
 )
 
 
+
 chunks = splitter.split_documents(
     documents
 )
+
 
 
 print(
@@ -96,17 +130,22 @@ print("\n3. Создание модели поиска...")
 
 embeddings = HuggingFaceEmbeddings(
 
-    model_name="intfloat/multilingual-e5-large",
+    model_name="intfloat/multilingual-e5-base",
 
     model_kwargs={
+
         "device": "cpu"
+
     },
 
     encode_kwargs={
+
         "normalize_embeddings": True
+
     }
 
 )
+
 
 
 print(
@@ -131,23 +170,29 @@ db = Chroma.from_documents(
 )
 
 
+
 db.persist()
 
 
 
 print("\n" + "=" * 50)
 
-print("БАЗА ЗНАНИЙ СОЗДАНА!")
+print(
+    "БАЗА ЗНАНИЙ СОЗДАНА!"
+)
+
 
 print(
     "Фрагментов:",
     len(chunks)
 )
 
+
 print(
     "Путь:",
     os.path.abspath(DB_PATH)
 )
+
 
 print("=" * 50)
 
@@ -166,28 +211,51 @@ questions = [
 
     "технические характеристики",
 
-    "коробка передач"
+    "коробка передач",
+
+    "требования безопасности"
 
 ]
 
 
+
 for q in questions:
 
+
     print("\n----------------")
-    print("Запрос:")
+
+    print(
+        "Запрос:"
+    )
+
     print(q)
 
 
+
     result = db.similarity_search(
+
         q,
+
         k=1
+
     )
+
 
 
     if result:
 
+
         print(
+
             result[0].page_content[:500]
+
+        )
+
+
+    else:
+
+        print(
+            "Ничего не найдено"
         )
 
 

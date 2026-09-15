@@ -2,11 +2,15 @@ import os
 import re
 import threading
 
+
 from flask import Flask
+
 
 from dotenv import load_dotenv
 
+
 from telegram import Update
+
 
 from telegram.ext import (
     Application,
@@ -16,18 +20,56 @@ from telegram.ext import (
     filters
 )
 
+
 from langchain_huggingface import HuggingFaceEmbeddings
+
 from langchain_community.vectorstores import Chroma
+
 from langchain_openai import ChatOpenAI
+
 
 
 load_dotenv()
 
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-ROUTERAI_API_KEY = os.getenv("ROUTERAI_API_KEY")
 
-PORT = int(os.environ.get("PORT", 10000))
+TELEGRAM_TOKEN = os.getenv(
+    "TELEGRAM_TOKEN"
+)
+
+
+ROUTERAI_API_KEY = os.getenv(
+    "ROUTERAI_API_KEY"
+)
+
+
+
+PORT = int(
+    os.environ.get(
+        "PORT",
+        10000
+    )
+)
+
+
+
+if not TELEGRAM_TOKEN:
+
+    raise Exception(
+        "Нет TELEGRAM_TOKEN"
+    )
+
+
+
+if not ROUTERAI_API_KEY:
+
+    raise Exception(
+        "Нет ROUTERAI_API_KEY"
+    )
+
+
+
+
 
 
 
@@ -35,10 +77,12 @@ PORT = int(os.environ.get("PORT", 10000))
 web_app = Flask(__name__)
 
 
+
 @web_app.route("/")
 def home():
 
     return "BELARUS 1523 bot is running"
+
 
 
 
@@ -57,19 +101,29 @@ def run_web():
 
 
 
-print("Загрузка базы знаний...")
+
+
+print(
+    "Загрузка базы знаний..."
+)
+
 
 
 embeddings = HuggingFaceEmbeddings(
 
-    model_name="intfloat/multilingual-e5-large",
+    model_name=
+    "intfloat/multilingual-e5-base",
 
     model_kwargs={
+
         "device": "cpu"
+
     },
 
     encode_kwargs={
+
         "normalize_embeddings": True
+
     }
 
 )
@@ -86,7 +140,11 @@ db = Chroma(
 
 
 
-print("База знаний загружена")
+print(
+    "База знаний загружена"
+)
+
+
 
 
 
@@ -95,11 +153,14 @@ print("База знаний загружена")
 
 llm = ChatOpenAI(
 
-    model="~deepseek/deepseek-v4-flash-latest",
+    model=
+    "deepseek/deepseek-v4-flash-latest",
 
-    api_key=ROUTERAI_API_KEY,
+    api_key=
+    ROUTERAI_API_KEY,
 
-    base_url="https://routerai.ru/api/v1",
+    base_url=
+    "https://routerai.ru/api/v1",
 
     temperature=0.2
 
@@ -107,7 +168,11 @@ llm = ChatOpenAI(
 
 
 
-print("ИИ модель подключена")
+print(
+    "ИИ модель подключена"
+)
+
+
 
 
 
@@ -117,9 +182,11 @@ print("ИИ модель подключена")
 def clean_text(text):
 
 
+    # номера разделов
+
     text = re.sub(
 
-        r'\b\d+\.\d+(\.\d+)*\b',
+        r'\b\d+(\.\d+)+\b',
 
         '',
 
@@ -127,6 +194,9 @@ def clean_text(text):
 
     )
 
+
+
+    # рисунки
 
     text = re.sub(
 
@@ -141,6 +211,9 @@ def clean_text(text):
     )
 
 
+
+    # таблицы
+
     text = re.sub(
 
         r'таблица\s*\d+(\.\d+)*',
@@ -154,6 +227,9 @@ def clean_text(text):
     )
 
 
+
+    # страницы
+
     text = re.sub(
 
         r'стр\.?\s*\d+',
@@ -165,6 +241,7 @@ def clean_text(text):
         flags=re.IGNORECASE
 
     )
+
 
 
     text = re.sub(
@@ -182,12 +259,19 @@ def clean_text(text):
 
 
 
+
+
+
+
+
 def get_roots(text):
 
 
     words = [
 
-        x.lower().strip(".,!?")
+        x.lower().strip(
+            ".,!?"
+        )
 
         for x in text.split()
 
@@ -203,6 +287,8 @@ def get_roots(text):
         if len(w) >= 5
 
     ]
+
+
 
 
 
@@ -231,12 +317,19 @@ async def start(
 - неисправностям;
 - характеристикам.
 
-Можно писать:
+Можно написать:
+
 "кратко про двигатель"
+
 "подробно про безопасность"
 """
 
     )
+
+
+
+
+
 
 
 
@@ -260,6 +353,7 @@ async def answer(
     )
 
 
+
     try:
 
 
@@ -273,12 +367,15 @@ async def answer(
 
 
 
-        # короткие запросы
+    
+
 
         if len(question.split()) <= 2:
 
 
-            roots = get_roots(question)
+            roots = get_roots(
+                question
+            )
 
 
             variants = []
@@ -291,7 +388,10 @@ async def answer(
                 for line in doc.page_content.split("\n"):
 
 
-                    line = clean_text(line)
+                    line = clean_text(
+                        line
+                    )
+
 
 
                     if len(line) < 20:
@@ -308,13 +408,17 @@ async def answer(
 
                     ):
 
-                        variants.append(line)
+                        variants.append(
+                            line
+                        )
 
 
 
             variants = list(
 
-                dict.fromkeys(variants)
+                dict.fromkeys(
+                    variants
+                )
 
             )
 
@@ -325,7 +429,7 @@ async def answer(
 
                 await update.message.reply_text(
 
-                    "Нашёл информацию по темам:\n\n"
+                    "Нашёл похожие темы:\n\n"
 
                     +
 
@@ -349,7 +453,12 @@ async def answer(
 
 
 
+
+       
+
+
         context_text = ""
+
 
 
         for doc, score in results:
@@ -368,13 +477,14 @@ async def answer(
 
 
 
+
         prompt = f"""
 
 Ты технический помощник по трактору
 БЕЛАРУС МТЗ-1523.
 
 
-Используй техническую информацию
+Используй только техническую информацию
 из руководства.
 
 
@@ -387,16 +497,24 @@ async def answer(
 - не упоминай таблицы;
 - не говори "в разделе";
 - не рассказывай процесс поиска;
-- не придумывай данные.
+- не придумывай технические данные.
 
 
-Если информации нет точно,
-используй максимально близкую тему.
+Если есть похожая информация,
+используй её.
 
 
-Текст:
+Если информации действительно нет:
+
+скажи:
+
+"В руководстве нет точного описания этого вопроса."
+
+
+Материал:
 
 {context_text}
+
 
 
 Вопрос:
@@ -408,16 +526,16 @@ async def answer(
 
 
         response = llm.invoke(
-
             prompt
-
         )
 
 
 
         await update.message.reply_text(
 
-            clean_text(response.content)
+            clean_text(
+                response.content
+            )
 
         )
 
@@ -440,6 +558,7 @@ async def answer(
             "Не удалось обработать запрос."
 
         )
+
 
 
 
@@ -482,7 +601,11 @@ telegram_app.add_handler(
 
 
 
-print("Бот запускается")
+
+
+print(
+    "Бот запускается"
+)
 
 
 
@@ -496,7 +619,9 @@ threading.Thread(
 
 
 
-print("Бот запущен")
+print(
+    "Бот запущен"
+)
 
 
 
