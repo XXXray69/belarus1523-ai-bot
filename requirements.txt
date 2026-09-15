@@ -13,3 +13,5 @@ pypdf
 sentence-transformers
 
 tiktoken
+
+flask
